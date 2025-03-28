@@ -1,7 +1,6 @@
 {
     "SCREEN_WIDTH": 1024,
     "SCREEN_HEIGHT": 768,
-    "FPS": 60,
     "COLOR_BACKGROUND": [
         0,
         0,
@@ -17,11 +16,11 @@
         0,
         0
     ],
-    "SNAKE_SPEED": 20,
+    "SNAKE_SPEED": 15,
     "FOOD_RESPAWN_TIME": 3,
     "INITIAL_SNAKE_LENGTH": 4,
-    "BACKGROUND_MUSIC": true,
-    "DIFFICULTY": "hard",
+    "BACKGROUND_MUSIC": false,
+    "DIFFICULTY": "easy",
     "THEME": "default",
-    "MUSIC_VOLUME": 0.43333333333333335
+    "MUSIC_VOLUME": 0.17666666666666667
 }

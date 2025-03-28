@@ -44,7 +44,7 @@ class EasyStrategy(DifficultyStrategy):
     אסטרטגיית קושי קלה – מהירות נמוכה ותדירות מופחתת של מכשולים.
     """
     def get_snake_speed(self) -> int:
-        return 5  # מהירות נמוכה
+        return 10  # מהירות נמוכה
 
     def get_obstacle_frequency(self) -> float:
         return 0.1  # תדירות נמוכה
@@ -64,7 +64,7 @@ class HardStrategy(DifficultyStrategy):
     אסטרטגיית קושי קשה – מהירות גבוהה ותדירות מכשולים מוגברת.
     """
     def get_snake_speed(self) -> int:
-        return 30  # מהירות גבוהה
+        return 20  # מהירות גבוהה
 
     def get_obstacle_frequency(self) -> float:
         return 0.5  # תדירות גבוהה
