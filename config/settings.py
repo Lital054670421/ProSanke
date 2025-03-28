@@ -20,11 +20,9 @@ FOOD_RESPAWN_TIME: float = 5.0
 INITIAL_SNAKE_LENGTH: int = 5
 BLOCK_SIZE = 40
 
-
 # Asset paths
 BACKGROUND_IMAGE_PATH: str = "assets/images/background.jpg"
 SNAKE_FONT_PATH: str = "assets/fonts/snake-game.ttf"
-
 
 # Dictionary for snake images
 SNAKE_IMAGES = {
@@ -54,3 +52,12 @@ SOUND_FOOD: str = "assets/audio/food.mp3"
 SOUND_GAMEOVER: str = "assets/audio/gameover.mp3"
 SOUND_MOVE: str = "assets/audio/move.mp3"
 MUSIC_BACKGROUND: str = "assets/audio/music.mp3"
+
+# --- Additional configuration for user customization ---
+# Path to configuration file
+CONFIG_FILE_PATH: str = "config/config.json"
+
+# User adjustable settings (defaults)
+BACKGROUND_MUSIC: bool = True       # True = on, False = off
+DIFFICULTY: str = "easy"             # Options: "easy", "medium", "hard"
+THEME: str = "default"               # Options: "default", "modern"
