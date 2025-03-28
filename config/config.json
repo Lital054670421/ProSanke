@@ -22,5 +22,6 @@
     "INITIAL_SNAKE_LENGTH": 4,
     "BACKGROUND_MUSIC": true,
     "DIFFICULTY": "hard",
-    "THEME": "default"
+    "THEME": "default",
+    "MUSIC_VOLUME": 0.43333333333333335
 }

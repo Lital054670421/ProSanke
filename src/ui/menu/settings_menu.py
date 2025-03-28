@@ -2,12 +2,12 @@
 settings_menu.py
 
 ממשק הגדרות המאפשר למשתמש להתאים את אפשרויות המשחק:
-- הפעלה/כיבוי מוזיקת רקע
-- בחירת רמת קושי (Easy, Medium, Hard)
-- בחירת ערכת נושא (Default, Modern)
+- הפעלה/כיבוי מוזיקת רקע.
+- שליטה בעוצמת הקול של המוזיקה באמצעות סליידר.
+- בחירת רמת קושי (Easy, Medium, Hard).
+- בחירת ערכת נושא (Default, Modern).
 
-הממשק טוען את ההגדרות דרך config_parser ומאחסן שינויים בקובץ קונפיגורציה.
-הקוד נכתב בצורה מודולרית ומובנה, כך שיהיה קל להרחבה ותחזוקה.
+הממשק טוען את ההגדרות דרך config_parser ומאחסן שינויים בקובץ הקונפיגורציה.
 """
 
 import sys
@@ -15,23 +15,17 @@ import pygame
 import config.config_parser as config_parser
 import config.settings as settings
 
-# ודא שהמשתנה CONFIG_FILE_PATH מוגדר, אם לא – הגדר ערך ברירת מחדל
 try:
     CONFIG_FILE_PATH = settings.CONFIG_FILE_PATH
 except AttributeError:
     CONFIG_FILE_PATH = "config/config.json"
 
+# Import SoundManager
+from src.audio.sound_manager import SoundManager
 
 class Button:
     """
     כפתור כללי לשימוש בממשק ההגדרות.
-    
-    מאפיינים:
-      - text: הטקסט שמוצג על הכפתור.
-      - rect: האזור (מיקום ומידות) של הכפתור.
-      - font: הפונט להצגת הטקסט.
-      - on_click: פונקציה שתופעל בלחיצה על הכפתור.
-      - text_color, bg_color, hover_color: צבעי טקסט, רקע ומצב ריחוף.
     """
     def __init__(self, text: str, rect: pygame.Rect, font: pygame.font.Font,
                  on_click: callable, text_color=(255, 255, 255),
@@ -46,10 +40,6 @@ class Button:
         self.hovered = False
 
     def draw(self, surface: pygame.Surface) -> None:
-        """
-        מצייר את הכפתור על משטח התצוגה.
-        במצב ריחוף (hover) משתמש בצבע hover, אחרת בצבע הרקע.
-        """
         color = self.hover_color if self.hovered else self.bg_color
         pygame.draw.rect(surface, color, self.rect)
         text_surface = self.font.render(self.text, True, self.text_color)
@@ -57,9 +47,6 @@ class Button:
         surface.blit(text_surface, text_rect)
 
     def update(self, events: list) -> None:
-        """
-        בודק עדכון עבור מצב ריחוף ולחיצות עכבר.
-        """
         mouse_pos = pygame.mouse.get_pos()
         self.hovered = self.rect.collidepoint(mouse_pos)
         for event in events:
@@ -67,59 +54,129 @@ class Button:
                 if self.hovered:
                     self.on_click()
 
+class Slider:
+    """
+    סליידר לשליטה בעוצמת המוזיקה.
+
+    מציג מסלול (track) עם ידית (handle) שניתן לגרור. הערך מחושב כיחס בין
+    המיקום של הידית לאורך המסלול. הערך יהיה בין min_val ל-max_val.
+    """
+    def __init__(self, x: int, y: int, width: int, height: int,
+                 min_val: float = 0.0, max_val: float = 1.0, initial_val: float = 0.6,
+                 track_color: tuple = (200, 200, 200), handle_color: tuple = (255, 0, 0)):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height  # גובה המסלול
+        self.min_val = min_val
+        self.max_val = max_val
+        self.value = initial_val
+        self.track_color = track_color
+        self.handle_color = handle_color
+
+        self.handle_radius = max(10, height // 2 + 4)
+        self.dragging = False
+
+    def _handle_rect(self) -> pygame.Rect:
+        """
+        מחזיר pygame.Rect שמייצג את אזור הידית, לצורך בדיקת לחיצה.
+        """
+        handle_x = self.x + int((self.value - self.min_val) / (self.max_val - self.min_val) * self.width)
+        handle_y = self.y + self.height // 2
+        return pygame.Rect(handle_x - self.handle_radius,
+                           handle_y - self.handle_radius,
+                           self.handle_radius * 2,
+                           self.handle_radius * 2)
+
+    def handle_event(self, event: pygame.event.Event) -> None:
+        """
+        מעבד אירועי עכבר כדי לבדוק לחיצה וגרירה של הידית.
+        """
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            if self._handle_rect().collidepoint(mx, my):
+                self.dragging = True
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            self.dragging = False
+
+    def update(self) -> None:
+        """
+        אם הידית נגררת, מחשב את הערך בהתאם למיקום העכבר.
+        """
+        if self.dragging:
+            mx, _ = pygame.mouse.get_pos()
+            relative_x = mx - self.x
+            if relative_x < 0:
+                relative_x = 0
+            elif relative_x > self.width:
+                relative_x = self.width
+            ratio = relative_x / self.width
+            self.value = self.min_val + (self.max_val - self.min_val) * ratio
+
+    def draw(self, surface: pygame.Surface) -> None:
+        """
+        מצייר את המסלול והידית של הסליידר.
+        """
+        track_rect = pygame.Rect(self.x, self.y + self.height // 2 - 2, self.width, 4)
+        pygame.draw.rect(surface, self.track_color, track_rect)
+        handle_x = self.x + int((self.value - self.min_val) / (self.max_val - self.min_val) * self.width)
+        handle_y = self.y + self.height // 2
+        pygame.draw.circle(surface, self.handle_color, (handle_x, handle_y), self.handle_radius)
+        # לא מציגים את הערך, כפי שהתבקש
 
 class SettingsMenu:
     """
     מחלקת SettingsMenu מציגה תפריט הגדרות שמאפשר:
       - הפעלה/כיבוי מוזיקת רקע.
+      - שליטה בעוצמת הקול באמצעות סליידר.
       - בחירת רמת קושי.
       - בחירת ערכת נושא.
-    
-    ההגדרות נטענות ונשמרות דרך config_parser, כך ששינויים יישמרו באופן קבוע.
+      
+    ההגדרות נטענות ונשמרות דרך config_parser.
     """
     def __init__(self, screen: pygame.Surface, config_file: str = CONFIG_FILE_PATH) -> None:
         self.screen = screen
         self.config_file = config_file
 
-        # טוען את הקונפיגורציה מהקובץ החיצוני
         try:
             self.config = config_parser.load_config(self.config_file)
         except Exception as e:
             print(f"Error loading config: {e}")
             self.config = {}
 
-        # מוודא שהמפתחות הדרושים קיימים – אם לא, משתמש בערכי ברירת המחדל מה-settings
         self.config.setdefault("BACKGROUND_MUSIC", getattr(settings, "BACKGROUND_MUSIC", True))
+        self.config.setdefault("MUSIC_VOLUME", getattr(settings, "MUSIC_VOLUME", 0.6))
         self.config.setdefault("DIFFICULTY", getattr(settings, "DIFFICULTY", "easy"))
         self.config.setdefault("THEME", getattr(settings, "THEME", "default"))
 
-        # אתחול הפונט והכפתורים
         self.font = pygame.font.Font(settings.SNAKE_FONT_PATH, 32)
         self.buttons = []
         self.running = True
+
+        self.sound_manager = SoundManager()
+        self.sound_manager.set_volume(self.config["MUSIC_VOLUME"])
+
+        slider_x = (settings.SCREEN_WIDTH - 300) // 2
+        slider_y = 150 + 80  # מתחת לכפתור המוזיקה
+        self.volume_slider = Slider(slider_x, slider_y, 300, 20, initial_val=self.config["MUSIC_VOLUME"])
+
         self.create_buttons()
 
     def create_buttons(self) -> None:
-        """
-        יוצר את כל הכפתורים בתפריט:
-          - כפתור להפעלת/כיבוי מוזיקת רקע.
-          - כפתורי בחירת רמת קושי.
-          - כפתורי בחירת ערכת נושא.
-          - כפתור Save & Return.
-        """
         screen_width, screen_height = settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT
         center_x = screen_width // 2
-
         start_y = 150
         btn_width = 300
         btn_height = 50
         gap = 80
 
-        # כפתור הפעלת/כיבוי מוזיקת רקע
         def toggle_music():
             self.config["BACKGROUND_MUSIC"] = not self.config["BACKGROUND_MUSIC"]
-            # עדכון הטקסט על הכפתור בהתאם למצב החדש
             bg_music_button.text = f"Background Music: {'On' if self.config['BACKGROUND_MUSIC'] else 'Off'}"
+            if self.config["BACKGROUND_MUSIC"]:
+                self.sound_manager.play_music()
+            else:
+                self.sound_manager.stop_music()
 
         bg_music_button = Button(
             text=f"Background Music: {'On' if self.config['BACKGROUND_MUSIC'] else 'Off'}",
@@ -131,7 +188,6 @@ class SettingsMenu:
         )
         self.buttons.append(bg_music_button)
 
-        # כפתורי בחירת רמת קושי
         difficulty_options = ["easy", "medium", "hard"]
         diff_btn_width = 100
         diff_gap = 20
@@ -141,7 +197,6 @@ class SettingsMenu:
             def make_diff_click(lvl):
                 def set_difficulty():
                     self.config["DIFFICULTY"] = lvl
-                    # עדכון צבעי הכפתורים לפי הבחירה הנוכחית
                     for btn in self.buttons:
                         if hasattr(btn, 'difficulty_option'):
                             btn.bg_color = (100, 0, 100) if btn.difficulty_option == self.config["DIFFICULTY"] else (50, 0, 50)
@@ -149,16 +204,15 @@ class SettingsMenu:
 
             diff_button = Button(
                 text=level.capitalize(),
-                rect=pygame.Rect(diff_start_x + i * (diff_btn_width + diff_gap), start_y + gap, diff_btn_width, btn_height),
+                rect=pygame.Rect(diff_start_x + i * (diff_btn_width + diff_gap), start_y + 2 * gap, diff_btn_width, btn_height),
                 font=self.font,
                 on_click=make_diff_click(level),
                 bg_color=(100, 0, 100) if self.config["DIFFICULTY"] == level else (50, 0, 50),
                 hover_color=(150, 0, 150)
             )
-            diff_button.difficulty_option = level  # תכונה מותאמת אישית לזיהוי
+            diff_button.difficulty_option = level
             self.buttons.append(diff_button)
 
-        # כפתורי בחירת ערכת נושא
         theme_options = ["default", "modern"]
         theme_btn_width = 150
         theme_gap = 20
@@ -175,7 +229,7 @@ class SettingsMenu:
 
             theme_button = Button(
                 text=theme_option.capitalize(),
-                rect=pygame.Rect(theme_start_x + i * (theme_btn_width + theme_gap), start_y + 2 * gap, theme_btn_width, btn_height),
+                rect=pygame.Rect(theme_start_x + i * (theme_btn_width + theme_gap), start_y + 3 * gap, theme_btn_width, btn_height),
                 font=self.font,
                 on_click=make_theme_click(theme_option),
                 bg_color=(0, 100, 0) if self.config["THEME"] == theme_option else (0, 50, 0),
@@ -184,8 +238,9 @@ class SettingsMenu:
             theme_button.theme_option = theme_option
             self.buttons.append(theme_button)
 
-        # כפתור Save & Return
         def save_and_return():
+            self.config["MUSIC_VOLUME"] = self.volume_slider.value
+            self.sound_manager.set_volume(self.volume_slider.value)
             try:
                 config_parser.save_config(self.config, self.config_file)
                 print("Configuration saved successfully.")
@@ -195,7 +250,7 @@ class SettingsMenu:
 
         save_button = Button(
             text="Save & Return",
-            rect=pygame.Rect(center_x - btn_width // 2, start_y + 3 * gap, btn_width, btn_height),
+            rect=pygame.Rect(center_x - btn_width // 2, start_y + 4 * gap, btn_width, btn_height),
             font=self.font,
             on_click=save_and_return,
             bg_color=(100, 100, 0),
@@ -204,24 +259,26 @@ class SettingsMenu:
         self.buttons.append(save_button)
 
     def run(self) -> None:
-        """
-        מפעיל את לולאת תפריט ההגדרות עד שהמשתמש מסיים (בלחיצה על Save & Return).
-        """
         clock = pygame.time.Clock()
         while self.running:
             dt = clock.tick(settings.FPS) / 1000.0
             events = pygame.event.get()
-
             for event in events:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
 
-            # עדכון כל הכפתורים
+            # מעבירים את אותם אירועים לסליידר ולכפתורים
+            for event in events:
+                self.volume_slider.handle_event(event)
+            self.volume_slider.update()
+
             for btn in self.buttons:
                 btn.update(events)
 
-            # ציור המסך
+            # עדכון מידי של עוצמת הקול
+            self.sound_manager.set_volume(self.volume_slider.value)
+
             self.screen.fill((20, 20, 20))
             title_surf = self.font.render("Settings", True, (255, 255, 255))
             title_rect = title_surf.get_rect(center=(settings.SCREEN_WIDTH // 2, 80))
@@ -230,5 +287,6 @@ class SettingsMenu:
             for btn in self.buttons:
                 btn.draw(self.screen)
 
+            self.volume_slider.draw(self.screen)
+                
             pygame.display.flip()
-        return

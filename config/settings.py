@@ -7,7 +7,7 @@ Global configuration settings for the Snake game project.
 # Display settings
 SCREEN_WIDTH: int = 800
 SCREEN_HEIGHT: int = 800
-FPS: int = 10
+FPS: int = 15
 
 # Colors (fallback if images not used)
 COLOR_BACKGROUND: tuple[int, int, int] = (0, 0, 0)
@@ -19,6 +19,8 @@ SNAKE_SPEED: int = 15
 FOOD_RESPAWN_TIME: float = 5.0
 INITIAL_SNAKE_LENGTH: int = 5
 BLOCK_SIZE = 40
+
+MUSIC_VOLUME: float = 0.6
 
 # Asset paths
 BACKGROUND_IMAGE_PATH: str = "assets/images/background.jpg"

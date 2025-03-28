@@ -13,6 +13,8 @@ Changes requested:
 1. Show "Game Over" on screen for a few seconds before returning to the main menu.
 2. Score 50 points per apple eaten.
 3. HUD shows time and score in real time.
+4. Integrate SoundManager for background music and sound effects (e.g. move, food, game over).
+5. Adjust game speed according to difficulty (using a discrete update via accumulator).
 """
 
 import sys
@@ -21,12 +23,12 @@ from typing import Any
 import pygame
 import config.settings as settings
 
-# Importing core modules (using absolute imports for consistency)
+# Importing core modules
 from src.core.game_state import GameState, GameStateManager
 from src.core.snake import Snake
 from src.core.food import Food
 from src.core.collision import check_collision
-from src.core.level import LevelManager
+from src.core.level import LevelManager  # Includes manual difficulty setting
 
 # Correctly import config_parser from the config folder
 import config.config_parser as config_parser
@@ -41,13 +43,10 @@ from src.graphics.effects import EffectsManager, ParticleEffect
 # Importing the main menu module
 from src.ui.menu.main_menu import MainMenu
 
-# --- New imports for HUD and Dialogs ---
+# --- New imports for HUD, Dialogs, and Sound ---
 from src.ui.hud import HUD
 from src.ui.dialogs import PauseDialog  # We won't use GameOverDialog; we'll show text ourselves.
-
-# Uncomment the following line if integrating audio functionality:
-# from src.audio.sound_manager import SoundManager
-
+from src.audio.sound_manager import SoundManager
 
 class GameLogic:
     """
@@ -58,16 +57,17 @@ class GameLogic:
         """
         מאתחל את מערכת הלוגיקה:
           - GameStateManager לניהול מצבי המשחק.
-          - LevelManager לניהול רמות קושי בהתאם לציון.
+          - LevelManager לניהול רמות הקושי – ניתן לעדכן ידנית בהתאם לבחירה.
           - AnimationManager לניהול אנימציות (לדוגמה, fade in/out).
           - EffectsManager לניהול אפקטים ויזואליים (כגון חלקיקים).
-          - משתנה score למעקב אחרי הציון.
+          - משתנה score למעקב אחרי הניקוד.
           - HUD לתצוגה בזמן אמת.
+          - SoundManager לניהול מוזיקת רקע ואפקטים קוליים.
         """
         self.game_state_manager: GameStateManager = GameStateManager(initial_state=GameState.RUNNING)
         self.clock: pygame.time.Clock = pygame.time.Clock()
-        self.snake: Snake = None
-        self.food: Food = None
+        self.snake: Snake = None  # יאוכלס בתוך run() לאחר אתחול Pygame
+        self.food: Food = None    # יאוכלס בתוך run() לאחר אתחול Pygame
         self.running: bool = True
         self.score: int = 0
         self.level_manager: LevelManager = LevelManager(initial_score=self.score)
@@ -75,6 +75,11 @@ class GameLogic:
         self.effects_manager: EffectsManager = EffectsManager()
         self.hud: HUD = None
         self.paused: bool = False
+
+        # אתחול מנהל האודיו (Singleton)
+        self.sound_manager = SoundManager()
+        if getattr(settings, "BACKGROUND_MUSIC", True):
+            self.sound_manager.play_music()
 
         # אפקט fade in בתחילת המשחק
         self.animation_manager.add_animation(
@@ -85,6 +90,10 @@ class GameLogic:
                 fade_in=True
             )
         )
+
+        # מאגר זמן לעדכון תנועת הנחש
+        self.move_accumulator = 0.0
+        self.base_interval = 0.0 # זמן בסיסי לעדכון (בשניות) לעדכון בינוני
 
     def process_input(self) -> None:
         """
@@ -98,18 +107,22 @@ class GameLogic:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
                 elif event.key == pygame.K_p:
-                    # לחיצה על P מפעילה Pause
                     self.handle_pause()
-                # שליטה בנחש
+                # שליטה בנחש + הפעלת אפקט "SOUND_MOVE" בעת שינוי כיוון
                 if self.snake:
                     if event.key == pygame.K_UP:
                         self.snake.change_direction("UP")
+                        self.sound_manager.play_sound("SOUND_MOVE")
                     elif event.key == pygame.K_DOWN:
                         self.snake.change_direction("DOWN")
+                        self.sound_manager.play_sound("SOUND_MOVE")
                     elif event.key == pygame.K_LEFT:
                         self.snake.change_direction("LEFT")
+                        self.sound_manager.play_sound("SOUND_MOVE")
                     elif event.key == pygame.K_RIGHT:
                         self.snake.change_direction("RIGHT")
+                        self.sound_manager.play_sound("SOUND_MOVE")
+
 
     def handle_pause(self) -> None:
         """
@@ -122,7 +135,6 @@ class GameLogic:
             screen_height=settings.SCREEN_HEIGHT,
             font=pygame.font.Font(settings.SNAKE_FONT_PATH, 36)
         )
-
         while pause_dialog.is_open:
             events = pygame.event.get()
             for e in events:
@@ -130,12 +142,10 @@ class GameLogic:
                     pygame.quit()
                     sys.exit()
                 pause_dialog.handle_event(e)
-
-            self.render(self.screen)  # מציג את המצב הנוכחי של המשחק (קפוא)
+            self.render(self.screen)
             pause_dialog.draw(self.screen)
             pygame.display.flip()
             self.clock.tick(30)
-
         self.paused = False
 
     def update(self, dt: float) -> None:
@@ -146,18 +156,25 @@ class GameLogic:
         """
         if self.paused:
             return
-
         if (self.snake is None) or (self.food is None):
             return
 
         if self.game_state_manager.get_state() == GameState.RUNNING:
-            self.snake.update(dt)
+            base_speed = settings.SNAKE_SPEED  # לדוגמה 15
+            difficulty_speed = self.level_manager.strategy.get_snake_speed()
+            speed_multiplier = difficulty_speed / base_speed
+            move_interval = self.base_interval / speed_multiplier
 
-            # בדיקה האם הנחש אוכל את האוכל
+            self.move_accumulator += dt
+            if self.move_accumulator >= move_interval:
+                self.snake.update()  # מתודת update מעדכנת את הנחש ב־block_size
+                self.move_accumulator -= move_interval
+
+            # בדיקת אכילת אוכל
             if check_collision(self.snake.body[0], self.food.position):
                 self.snake.grow()
                 self.food.respawn(self.snake.body)
-                self.score += 50  # מקבלים 50 נקודות על כל תפוח
+                self.score += 50  # כל תפוח שווה 50 נקודות
                 self.level_manager.update_score(self.score)
                 self.effects_manager.add_effect(
                     ParticleEffect(
@@ -168,18 +185,17 @@ class GameLogic:
                         particle_size=4
                     )
                 )
+                self.sound_manager.play_sound("SOUND_FOOD")
             
             # בדיקת התנגשות עם גבולות או עם עצמו
             if self.snake.check_self_collision() or \
                self.snake.check_wall_collision(settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT):
-                # מפסידים -> מצב GAME_OVER
                 self.game_state_manager.set_state(GameState.GAME_OVER)
+                self.sound_manager.play_sound("SOUND_GAMEOVER")
 
-        # עדכון אנימציות ואפקטים
         self.animation_manager.update(dt)
         self.effects_manager.update(dt)
 
-        # עדכון ה-HUD – ניקוד, זמן, מצב
         if self.hud:
             self.hud.set_score(self.score)
             current_state_str = self.game_state_manager.get_state().value
@@ -194,13 +210,10 @@ class GameLogic:
          - מצייר HUD מעל הכול.
         """
         renderer = Renderer(screen)
-
         if self.snake and self.food:
             renderer.render_game(self.snake, self.food, self.game_state_manager.get_state())
-
         self.animation_manager.draw(screen)
         self.effects_manager.draw(screen)
-
         if self.hud:
             self.hud.draw(screen)
 
@@ -213,7 +226,6 @@ class GameLogic:
         header_text = "Statistics"
         score_text = f"Your Score: {self.score}"
         instruction_text = "Press any key to return to the main menu"
-
         running_stats = True
         while running_stats:
             for event in pygame.event.get():
@@ -222,16 +234,13 @@ class GameLogic:
                     sys.exit()
                 elif event.type == pygame.KEYDOWN:
                     running_stats = False
-
             screen.fill((50, 50, 50))
             header_surf = font.render(header_text, True, (255, 255, 255))
             score_surf = font.render(score_text, True, (255, 255, 255))
             instr_surf = font.render(instruction_text, True, (200, 200, 200))
-
             header_rect = header_surf.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 3))
             score_rect = score_surf.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2))
             instr_rect = instr_surf.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT * 2 // 3))
-
             screen.blit(header_surf, header_rect)
             screen.blit(score_surf, score_rect)
             screen.blit(instr_surf, instr_rect)
@@ -243,13 +252,11 @@ class GameLogic:
         """
         start_time = time.time()
         font = pygame.font.Font(settings.SNAKE_FONT_PATH, 48)
-
         while time.time() - start_time < duration:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-
             screen.fill((0, 0, 0))
             text_surf = font.render("GAME OVER", True, (255, 0, 0))
             text_rect = text_surf.get_rect(center=(settings.SCREEN_WIDTH // 2,
@@ -266,18 +273,17 @@ class GameLogic:
         self.screen: pygame.Surface = pygame.display.set_mode((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT))
         pygame.display.set_caption("Snake Game")
 
-        # כאן נשתמש בפונט ברירת מחדל עבור ה-HUD בלבד
-        default_hud_font = pygame.font.SysFont(None, 24)  # None => פונט דיפולטי של המערכת, גודל 24
-
+        # שימוש בפונט ברירת מחדל עבור ה-HUD (System font)
+        default_hud_font = pygame.font.SysFont(None, 24)
         self.hud = HUD(
-            font=default_hud_font,  # במקום pygame.font.Font(settings.SNAKE_FONT_PATH, 24)
+            font=default_hud_font,
             screen_width=settings.SCREEN_WIDTH,
             screen_height=settings.SCREEN_HEIGHT
         )
 
         done = False
         while not done:
-            menu = MainMenu(self.screen)  # תפריט ראשי משתמש בפונט המיוחד מתוך main_menu.py
+            menu = MainMenu(self.screen)
             action = menu.run()
 
             if action == "exit" or action is None:
@@ -288,6 +294,8 @@ class GameLogic:
                 self.snake = Snake()
                 self.food = Food()
                 self.hud.reset_timer()
+                # עדכון רמת הקושי לפי ההגדרות
+                self.level_manager.set_difficulty(getattr(settings, "DIFFICULTY", "easy"))
                 self.game_loop(self.screen)
                 if self.game_state_manager.get_state() == GameState.GAME_OVER:
                     self.show_game_over_text(self.screen, duration=3.0)
@@ -320,14 +328,10 @@ class GameLogic:
             dt: float = self.clock.tick(settings.FPS) / 1000.0
             self.process_input()
             self.update(dt)
-
-            # אם מצב המשחק GAME_OVER, מסיימים את הלולאה
             if self.game_state_manager.get_state() == GameState.GAME_OVER:
                 self.running = False
-
             self.render(screen)
             pygame.display.flip()
-
         return
 
 

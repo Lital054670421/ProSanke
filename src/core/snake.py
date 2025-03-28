@@ -68,13 +68,7 @@ class Snake:
             return
         self.direction = new_direction
 
-    def update(self, dt: float) -> None:
-        """
-        מעדכן את תנועת הנחש בהתאם לכיוון הנוכחי.
-        מוסיף ראש חדש לרשימה ומסיר את הזנב, כך שהאורך נשמר קבוע (אלא אם כן מתבצעת הגדלה).
-        
-        :param dt: זמן חלוף מאז העדכון הקודם (בדרך כלל לא בשימוש ישיר כאן).
-        """
+    def update(self) -> None:
         head_x, head_y = self.body[0]
         if self.direction == "UP":
             new_head = (head_x, head_y - self.block_size)
@@ -87,10 +81,9 @@ class Snake:
         else:
             new_head = (head_x, head_y)
         
-        # הוספת הראש החדש לתחילת הרשימה
         self.body.insert(0, new_head)
-        # הסרת הזנב כדי לשמור על אורך קבוע
         self.body.pop()
+
 
     def grow(self) -> None:
         """
