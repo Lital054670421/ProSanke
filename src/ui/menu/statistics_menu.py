@@ -10,44 +10,11 @@ import pygame
 from typing import List, Tuple, Callable, Optional
 import config.settings as settings
 
+# Import unified UI components
+from src.ui.ui_components import Button
+
 # נניח שיש לך מחלקה stats_manager.py שאוספת נתונים מהמשחק
 from src.stats.stats_manager import StatsManager
-
-class Button:
-    """
-    כפתור כללי לשימוש בתפריטי ה-UI, בדומה למימוש ב-main_menu.py.
-    מאפשר לחיצה והצגת טקסט על מסך.
-    """
-    def __init__(self, text: str, x: int, y: int, width: int, height: int,
-                 font: pygame.font.Font,
-                 on_click: Callable[[], None],
-                 text_color=(255, 255, 255),
-                 bg_color=(0, 0, 0),
-                 hover_color=(50, 50, 50)):
-        self.text = text
-        self.rect = pygame.Rect(x, y, width, height)
-        self.font = font
-        self.on_click = on_click
-        self.text_color = text_color
-        self.bg_color = bg_color
-        self.hover_color = hover_color
-        self.is_hovered = False
-
-    def draw(self, surface: pygame.Surface) -> None:
-        color = self.hover_color if self.is_hovered else self.bg_color
-        pygame.draw.rect(surface, color, self.rect)
-        text_surf = self.font.render(self.text, True, self.text_color)
-        text_rect = text_surf.get_rect(center=self.rect.center)
-        surface.blit(text_surf, text_rect)
-
-    def update(self, events: List[pygame.event.Event]) -> None:
-        mouse_pos = pygame.mouse.get_pos()
-        self.is_hovered = self.rect.collidepoint(mouse_pos)
-        for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1 and self.is_hovered:
-                    self.on_click()
-
 
 class StatisticsMenu:
     """
@@ -74,10 +41,9 @@ class StatisticsMenu:
         btn_width, btn_height = 200, 60
         self.back_button = Button(
             text="Back",
-            x=(settings.SCREEN_WIDTH - btn_width) // 2,
-            y=settings.SCREEN_HEIGHT - btn_height - 50,
-            width=btn_width,
-            height=btn_height,
+            rect=pygame.Rect((settings.SCREEN_WIDTH - btn_width) // 2,
+                             settings.SCREEN_HEIGHT - btn_height - 50,
+                             btn_width, btn_height),
             font=self.font,
             on_click=self.on_back_clicked,
             text_color=(255, 255, 255),
@@ -138,7 +104,7 @@ class StatisticsMenu:
 
         # ציור כותרת
         title_surf = self.font.render("Statistics", True, (255, 255, 255))
-        title_rect = title_surf.get_rect(center=(settings.SCREEN_WIDTH//2, 50))
+        title_rect = title_surf.get_rect(center=(settings.SCREEN_WIDTH // 2, 50))
         self.screen.blit(title_surf, title_rect)
 
         # ניקוד גבוה
@@ -161,8 +127,8 @@ class StatisticsMenu:
         achievements_title = self.font.render("Achievements:", True, (255, 255, 255))
         self.screen.blit(achievements_title, (50, achievements_y))
         achievements_y += 40
-        for achv in achievements_list:
-            line_surf = self.font.render(f"- {achv}", True, (200, 200, 200))
+        for ach in achievements_list:
+            line_surf = self.font.render(f"- {ach}", True, (200, 200, 200))
             self.screen.blit(line_surf, (70, achievements_y))
             achievements_y += 40
 

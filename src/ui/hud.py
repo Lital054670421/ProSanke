@@ -8,10 +8,6 @@ and popups for newly unlocked achievements.
 
 import pygame
 
-# hud.py
-
-import pygame
-
 class HUD:
     def __init__(self, font: pygame.font.Font, screen_width: int, screen_height: int) -> None:
         self.font = font
@@ -24,9 +20,10 @@ class HUD:
 
         self.margin = 20
 
-        # הכנה לפופאפ יחיד
+        # Current popup and a queue for additional achievement popups
         self.current_popup: dict | None = None
         self.popup_timer: float = 0.0
+        self.popup_queue: list[dict] = []  # New: Queue of popup messages
 
     def set_score(self, new_score: int) -> None:
         self.score = new_score
@@ -39,33 +36,43 @@ class HUD:
 
     def update(self, dt: float) -> None:
         """
-        - מעדכן את זמן המשחק
-        - מוריד את הטיימר של הפופאפ (אם יש)
+        - Updates the game time.
+        - Decrements the current popup timer and, if expired, loads the next popup from the queue.
         """
         self.elapsed_time += dt
 
         if self.current_popup is not None:
             self.popup_timer -= dt
             if self.popup_timer <= 0:
-                self.current_popup = None  # מסירים את הפופאפ
+                # Current popup expired, move to the next in queue if available
+                self.current_popup = None
+                if self.popup_queue:
+                    next_popup = self.popup_queue.pop(0)
+                    self.current_popup = next_popup
+                    self.popup_timer = next_popup["duration"]
 
     def add_achievement_popup(self, achievement_name: str, duration: float = 3.0) -> None:
         """
-        מפעיל "חלון" מרכזי לחגיגת הישג – רק אחד בכל פעם.
-        אם כבר יש פופאפ פעיל, אפשר להחליט להחליף אותו או להתעלם, לבחירתך.
-        כאן נחליף אותו בפופאפ החדש.
+        Activates a popup for an achievement. If one is already active,
+        adds the new achievement to the popup queue.
         """
-        self.current_popup = {
-            "title": f"Achievement Unlocked!",
-            "text": f"{achievement_name}"
+        new_popup = {
+            "title": "Achievement Unlocked!",
+            "text": achievement_name,
+            "duration": duration
         }
-        self.popup_timer = duration
+        if self.current_popup is None:
+            self.current_popup = new_popup
+            self.popup_timer = duration
+        else:
+            self.popup_queue.append(new_popup)
 
     def draw(self, surface: pygame.Surface) -> None:
         """
-        מצייר ניקוד, זמן, מצב משחק + מצייר (אם יש) את ה-popup במרכז המסך.
+        Draws the basic HUD (score, time, game state) and, if available,
+        draws the active popup in the center of the screen.
         """
-        # --- ציור HUD בסיסי (ניקוד, זמן, מצב) ---
+        # Draw basic HUD: score, time, game state
         score_text = f"Score: {self.score}"
         score_surf = self.font.render(score_text, True, (255, 255, 255))
         surface.blit(score_surf, (self.margin, self.margin))
@@ -78,38 +85,37 @@ class HUD:
             state_surf = self.font.render(self.game_state_text, True, (255, 255, 0))
             surface.blit(state_surf, (self.margin, self.margin + 80))
 
-        # --- ציור הפופאפ אם הוא קיים ---
+        # Draw the popup if available
         if self.current_popup is not None:
             self.draw_popup(surface, self.current_popup["title"], self.current_popup["text"])
 
     def draw_popup(self, surface: pygame.Surface, title: str, text: str) -> None:
         """
-        מצייר מלבן חצי־שקוף במרכז המסך, עם כותרת וטקסט ההישג.
+        Draws a semi-transparent popup in the center of the screen with a title and text.
         """
-        # מידות החלון (תתאים כרצונך)
+        # Popup dimensions (adjust as needed)
         popup_width = 400
         popup_height = 200
 
-        # מיקום (מרכז המסך)
+        # Center position
         x = (self.screen_width - popup_width) // 2
         y = (self.screen_height - popup_height) // 2
 
-        # הכנת משטח חצי־שקוף לציור הרקע
+        # Create a semi-transparent surface for the popup background
         popup_surf = pygame.Surface((popup_width, popup_height), pygame.SRCALPHA)
-        # צבע רקע: שחור עם אלפא 160 (מתוך 255)
-        popup_surf.fill((0, 0, 0, 160))
+        popup_surf.fill((0, 0, 0, 160))  # Black with alpha=160
 
-        # צייר כותרת – גדול יחסית
+        # Draw the title (larger font)
         title_font = pygame.font.SysFont(None, 36)
         title_surf = title_font.render(title, True, (255, 255, 0))
         title_rect = title_surf.get_rect(center=(popup_width // 2, 50))
         popup_surf.blit(title_surf, title_rect)
 
-        # צייר טקסט ההישג
+        # Draw the achievement text
         text_font = pygame.font.SysFont(None, 28)
         text_surf = text_font.render(text, True, (255, 215, 0))
         text_rect = text_surf.get_rect(center=(popup_width // 2, 110))
         popup_surf.blit(text_surf, text_rect)
 
-        # לבסוף שופך את המשטח על המסך
+        # Blit the popup surface onto the main surface
         surface.blit(popup_surf, (x, y))

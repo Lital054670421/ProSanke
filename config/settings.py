@@ -48,6 +48,8 @@ SNAKE_IMAGES = {
 
 # Apple image path
 APPLE_IMAGE_PATH = "assets/images/apple.png"
+# NEW: Bomb image path
+BOMB_IMAGE_PATH: str = "assets/images/bomb.png"
 
 # Audio paths
 SOUND_FOOD: str = "assets/audio/food.mp3"

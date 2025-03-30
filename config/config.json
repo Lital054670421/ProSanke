@@ -20,7 +20,7 @@
     "FOOD_RESPAWN_TIME": 3,
     "INITIAL_SNAKE_LENGTH": 4,
     "BACKGROUND_MUSIC": false,
-    "DIFFICULTY": "easy",
+    "DIFFICULTY": "hard",
     "THEME": "default",
-    "MUSIC_VOLUME": 0.17666666666666667
+    "MUSIC_VOLUME": 0.39
 }

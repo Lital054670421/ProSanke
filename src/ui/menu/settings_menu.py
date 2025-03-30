@@ -23,106 +23,8 @@ except AttributeError:
 # Import SoundManager
 from src.audio.sound_manager import SoundManager
 
-class Button:
-    """
-    כפתור כללי לשימוש בממשק ההגדרות.
-    """
-    def __init__(self, text: str, rect: pygame.Rect, font: pygame.font.Font,
-                 on_click: callable, text_color=(255, 255, 255),
-                 bg_color=(0, 0, 0), hover_color=(50, 50, 50)):
-        self.text = text
-        self.rect = rect
-        self.font = font
-        self.on_click = on_click
-        self.text_color = text_color
-        self.bg_color = bg_color
-        self.hover_color = hover_color
-        self.hovered = False
-
-    def draw(self, surface: pygame.Surface) -> None:
-        color = self.hover_color if self.hovered else self.bg_color
-        pygame.draw.rect(surface, color, self.rect)
-        text_surface = self.font.render(self.text, True, self.text_color)
-        text_rect = text_surface.get_rect(center=self.rect.center)
-        surface.blit(text_surface, text_rect)
-
-    def update(self, events: list) -> None:
-        mouse_pos = pygame.mouse.get_pos()
-        self.hovered = self.rect.collidepoint(mouse_pos)
-        for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if self.hovered:
-                    self.on_click()
-
-class Slider:
-    """
-    סליידר לשליטה בעוצמת המוזיקה.
-
-    מציג מסלול (track) עם ידית (handle) שניתן לגרור. הערך מחושב כיחס בין
-    המיקום של הידית לאורך המסלול. הערך יהיה בין min_val ל-max_val.
-    """
-    def __init__(self, x: int, y: int, width: int, height: int,
-                 min_val: float = 0.0, max_val: float = 1.0, initial_val: float = 0.6,
-                 track_color: tuple = (200, 200, 200), handle_color: tuple = (255, 0, 0)):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height  # גובה המסלול
-        self.min_val = min_val
-        self.max_val = max_val
-        self.value = initial_val
-        self.track_color = track_color
-        self.handle_color = handle_color
-
-        self.handle_radius = max(10, height // 2 + 4)
-        self.dragging = False
-
-    def _handle_rect(self) -> pygame.Rect:
-        """
-        מחזיר pygame.Rect שמייצג את אזור הידית, לצורך בדיקת לחיצה.
-        """
-        handle_x = self.x + int((self.value - self.min_val) / (self.max_val - self.min_val) * self.width)
-        handle_y = self.y + self.height // 2
-        return pygame.Rect(handle_x - self.handle_radius,
-                           handle_y - self.handle_radius,
-                           self.handle_radius * 2,
-                           self.handle_radius * 2)
-
-    def handle_event(self, event: pygame.event.Event) -> None:
-        """
-        מעבד אירועי עכבר כדי לבדוק לחיצה וגרירה של הידית.
-        """
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mx, my = event.pos
-            if self._handle_rect().collidepoint(mx, my):
-                self.dragging = True
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            self.dragging = False
-
-    def update(self) -> None:
-        """
-        אם הידית נגררת, מחשב את הערך בהתאם למיקום העכבר.
-        """
-        if self.dragging:
-            mx, _ = pygame.mouse.get_pos()
-            relative_x = mx - self.x
-            if relative_x < 0:
-                relative_x = 0
-            elif relative_x > self.width:
-                relative_x = self.width
-            ratio = relative_x / self.width
-            self.value = self.min_val + (self.max_val - self.min_val) * ratio
-
-    def draw(self, surface: pygame.Surface) -> None:
-        """
-        מצייר את המסלול והידית של הסליידר.
-        """
-        track_rect = pygame.Rect(self.x, self.y + self.height // 2 - 2, self.width, 4)
-        pygame.draw.rect(surface, self.track_color, track_rect)
-        handle_x = self.x + int((self.value - self.min_val) / (self.max_val - self.min_val) * self.width)
-        handle_y = self.y + self.height // 2
-        pygame.draw.circle(surface, self.handle_color, (handle_x, handle_y), self.handle_radius)
-        # לא מציגים את הערך, כפי שהתבקש
+# Import unified UI components
+from src.ui.ui_components import Button, Slider
 
 class SettingsMenu:
     """
@@ -268,7 +170,7 @@ class SettingsMenu:
                     pygame.quit()
                     sys.exit()
 
-            # מעבירים את אותם אירועים לסליידר ולכפתורים
+            # Pass events to slider and buttons
             for event in events:
                 self.volume_slider.handle_event(event)
             self.volume_slider.update()
@@ -276,7 +178,7 @@ class SettingsMenu:
             for btn in self.buttons:
                 btn.update(events)
 
-            # עדכון מידי של עוצמת הקול
+            # Update volume continuously
             self.sound_manager.set_volume(self.volume_slider.value)
 
             self.screen.fill((20, 20, 20))
